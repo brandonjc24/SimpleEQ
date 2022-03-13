@@ -391,6 +391,15 @@ void ResponseCurveComponent::resized()
 
         g.setColour(gDb == 0.f ? Colours::black : Colours::darkgrey);
         g.drawFittedText(str, r, juce::Justification::centred, 1);
+
+        str.clear();
+        str << (gDb - 24.f);
+
+        r.setX(1);
+        textWidth = g.getCurrentFont().getStringWidth(str);
+        r.setSize(textWidth, fontHeight);
+        g.setColour(Colours::darkgrey);
+        g.drawFittedText(str, r, juce::Justification::centred, 1);
     }
 
 }
@@ -404,8 +413,8 @@ juce::Rectangle<int> ResponseCurveComponent::getRenderArea()
 
     //bounds.removeFromTop(13);
     //bounds.removeFromBottom(13);
-    //bounds.removeFromLeft(13);
-    bounds.removeFromRight(9);
+    bounds.removeFromLeft(11);
+    bounds.removeFromRight(11);
 
     return bounds;
 }
