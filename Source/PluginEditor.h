@@ -68,6 +68,7 @@ struct ResponseCurveComponent : juce::Component,
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override { }
     void timerCallback() override;
 
+    void resized() override;
     void paint(juce::Graphics& g) override;
 private:
     SimpleEQAudioProcessor& audioProcessor;
@@ -76,6 +77,10 @@ private:
     MonoChain monoChain;
 
     void updateChain();
+
+    juce::Image background;
+    juce::Rectangle<int> getRenderArea();
+    juce::Rectangle<int> getAnalysisArea();
 };
 
 //==============================================================================

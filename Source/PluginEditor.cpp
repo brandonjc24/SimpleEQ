@@ -20,10 +20,10 @@ void LookAndFeel::drawRotarySlider(juce::Graphics& g,
 
     auto bounds = Rectangle<float>(x, y, width, height);
 
-    g.setColour(Colours::midnightblue);
+    g.setColour(Colours::slategrey);
     g.fillEllipse(bounds);
-    g.setColour(Colours::white);
-    g.drawEllipse(bounds, 1.f);
+    g.setColour(Colours::black);
+    g.drawEllipse(bounds, 2.f);
 
     if (auto* rswl = dynamic_cast<RotarySliderWithLabels*>(&slider))
     {
@@ -52,10 +52,10 @@ void LookAndFeel::drawRotarySlider(juce::Graphics& g,
         r.setSize(strWidth + 4, rswl->getTextHeight() + 2);
         r.setCentre(center);
     
-        g.setColour(Colours::midnightblue);
+        g.setColour(Colours::slategrey);
         g.fillRect(r);
 
-        g.setColour(Colours::white);
+        g.setColour(Colours::black);
         g.drawFittedText(text, r.toNearestInt(), juce::Justification::centred, 1);
     }
 
@@ -220,9 +220,13 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
 {
     using namespace juce;
     // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll(Colours::black);
+    g.fillAll(Colours::white);
 
-    auto responseArea = getLocalBounds();
+    g.drawImage(background, getLocalBounds().toFloat());
+    //g.fillAll(Colours::white);
+
+    //auto responseArea = getLocalBounds();
+    auto responseArea = getAnalysisArea();
     auto w = responseArea.getWidth();
 
     auto& lowcut = monoChain.get<ChainPositions::LowCut>();
@@ -280,13 +284,89 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
         responseCurve.lineTo(responseArea.getX() + i, map(mags[i]));
     }
 
-    g.setColour(Colours::forestgreen);
-    g.drawRoundedRectangle(responseArea.toFloat(), 4.f, 1.f);
+    g.setColour(Colours::darkgreen);
+    g.drawRect(getRenderArea(), 2.f);
 
-    g.setColour(Colours::white);
+    g.setColour(Colours::black);
     g.strokePath(responseCurve, PathStrokeType(2.f));
 }
 
+void ResponseCurveComponent::resized()
+{
+    using namespace juce;
+
+    background = Image(Image::PixelFormat::RGB, getWidth(), getHeight(), false);
+    
+    Graphics g(background);
+
+    Array<float> freqs
+    {
+        20, 30, 40, 50, 100,
+        200, 300, 400, 500, 1000,
+        2000, 3000, 4000, 5000, 10000,
+        20000
+    };
+
+    auto renderArea = getAnalysisArea();
+    auto left = renderArea.getX();
+    auto right = renderArea.getRight();
+    auto top = renderArea.getY();
+    auto bottom = renderArea.getBottom();
+    auto width = renderArea.getWidth();
+
+    Array<float> gain
+    {
+        -24, -12, 0, 12, 24
+    };
+
+    for (auto gDb : gain)
+    {
+        auto y = jmap(gDb, -24.f, 24.f, float(bottom), float(top));
+        g.setColour(gDb == 0.f ? Colours::black : Colours::darkgrey);
+        g.drawHorizontalLine(y, left, right);
+    }
+
+    Array<float> xs;
+    for (auto f : freqs)
+    {
+        auto normX = mapFromLog10(f, 20.f, 20000.f);
+        if (f == 20000.f)
+            left -= 1;
+        xs.add(left + width * normX);
+    }
+
+    g.setColour(Colours::darkgrey);
+    for (auto x : xs)
+    {
+        g.drawVerticalLine(x, top, bottom);
+    }
+
+}
+
+juce::Rectangle<int> ResponseCurveComponent::getRenderArea()
+{
+    auto bounds = getLocalBounds();
+
+    bounds.reduce(13,//JUCE_LIVE_CONSTANT(5),
+        13); //JUCE_LIVE_CONSTANT(5));
+
+    //bounds.removeFromTop(13);
+    //bounds.removeFromBottom(3);
+    //bounds.removeFromLeft(20);
+    //bounds.removeFromRight(20);
+
+    return bounds;
+}
+
+juce::Rectangle<int> ResponseCurveComponent::getAnalysisArea()
+{
+    auto bounds = getRenderArea();
+    bounds.removeFromBottom(5);
+    bounds.removeFromTop(4);
+    bounds.removeFromRight(4);
+    bounds.removeFromLeft(4);
+    return bounds;
+}
 //==============================================================================
 SimpleEQAudioProcessorEditor::SimpleEQAudioProcessorEditor(SimpleEQAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p),
@@ -346,7 +426,7 @@ SimpleEQAudioProcessorEditor::~SimpleEQAudioProcessorEditor()
 void SimpleEQAudioProcessorEditor::paint (juce::Graphics& g)
 {
     using namespace juce;
-    g.fillAll (Colours::black);
+    g.fillAll (Colours::darkgrey);
 }
 
 void SimpleEQAudioProcessorEditor::resized()
