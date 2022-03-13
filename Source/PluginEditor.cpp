@@ -373,19 +373,39 @@ void ResponseCurveComponent::resized()
 
         g.drawFittedText(str, r, juce::Justification::centred, 1);
     }
+
+    for (auto gDb : gain)
+    {
+        auto y = jmap(gDb, -24.f, 24.f, float(bottom), float(top));
+        String str;
+        if (gDb > 0)
+            str << "+";
+        str << gDb;
+
+        auto textWidth = g.getCurrentFont().getStringWidth(str);
+
+        Rectangle<int> r;
+        r.setSize(textWidth, fontHeight);
+        r.setX(getWidth() - textWidth);
+        r.setCentre(r.getCentreX(), y);
+
+        g.setColour(gDb == 0.f ? Colours::black : Colours::darkgrey);
+        g.drawFittedText(str, r, juce::Justification::centred, 1);
+    }
+
 }
 
 juce::Rectangle<int> ResponseCurveComponent::getRenderArea()
 {
     auto bounds = getLocalBounds();
 
-    bounds.reduce(13,//JUCE_LIVE_CONSTANT(5),
-        13); //JUCE_LIVE_CONSTANT(5));
+    bounds.reduce(15,//JUCE_LIVE_CONSTANT(5),
+        15); //JUCE_LIVE_CONSTANT(5));
 
     //bounds.removeFromTop(13);
-    //bounds.removeFromBottom(3);
-    //bounds.removeFromLeft(20);
-    //bounds.removeFromRight(20);
+    //bounds.removeFromBottom(13);
+    //bounds.removeFromLeft(13);
+    bounds.removeFromRight(9);
 
     return bounds;
 }
