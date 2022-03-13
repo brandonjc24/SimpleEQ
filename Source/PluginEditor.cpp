@@ -36,7 +36,6 @@ void LookAndFeel::drawRotarySlider(juce::Graphics& g,
     r.setTop(bounds.getY());
     r.setBottom(center.getY());
 
-
     p.addRectangle(r);
 
     jassert(rotaryStartAngle < rotaryEndAngle);
@@ -44,7 +43,11 @@ void LookAndFeel::drawRotarySlider(juce::Graphics& g,
     auto sliderAngRad = jmap(sliderPosProportional, 0.f, 1.f, rotaryStartAngle, rotaryEndAngle);
 
     p.applyTransform(AffineTransform().rotated(sliderAngRad, center.getX(), center.getY()));
+
+    g.fillPath(p);
 }
+
+
 void RotarySliderWithLabels::paint(juce::Graphics& g)
 {
     using namespace juce;
