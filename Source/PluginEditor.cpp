@@ -52,8 +52,8 @@ void LookAndFeel::drawRotarySlider(juce::Graphics& g,
         r.setSize(strWidth + 4, rswl->getTextHeight() + 2);
         r.setCentre(center);
     
-        //g.setColour(Colours::black);
-        //g.fillRect(r);
+        g.setColour(Colours::midnightblue);
+        g.fillRect(r);
 
         g.setColour(Colours::white);
         g.drawFittedText(text, r.toNearestInt(), juce::Justification::centred, 1);
@@ -103,7 +103,39 @@ juce::Rectangle<int> RotarySliderWithLabels::getSliderBouds() const
 
 juce::String RotarySliderWithLabels::getDisplayString() const
 {
-    return juce::String(getValue());
+    if (auto* choiseParam = dynamic_cast<juce::AudioParameterChoice*>(param))
+        return choiseParam->getCurrentChoiceName();
+
+    juce::String str;
+    bool addK = false;
+
+    if (auto* floatParam = dynamic_cast<juce::AudioParameterFloat*>(param))
+    {
+        float val = getValue();
+
+        if (val > 999.f)
+        {
+            val /= 1000.f;
+            addK = true;
+        }
+
+        str = juce::String(val, (addK ? 2 : 0));
+    }
+    else
+    {
+        jassertfalse;
+    }
+
+    if (suffix.isNotEmpty())
+    {
+        str << " ";
+        if (addK)
+            str << "k";
+
+        str << suffix;
+    }
+
+    return str;
 }
 
 //===========================================================================================================
