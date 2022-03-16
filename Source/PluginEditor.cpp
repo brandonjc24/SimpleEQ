@@ -165,13 +165,18 @@ juce::String RotarySliderWithLabels::getDisplayString() const
 }
 
 //===========================================================================================================
-ResponseCurveComponent::ResponseCurveComponent(SimpleEQAudioProcessor& p) : audioProcessor(p)
+ResponseCurveComponent::ResponseCurveComponent(SimpleEQAudioProcessor& p) : 
+    audioProcessor(p),
+    leftChannelFifo(&audioProcessor.leftChannelFifo)
 {
     const auto& params = audioProcessor.getParameters();
     for (auto param : params)
     {
         param->addListener(this);
     }
+
+    leftChannelFFTDataGenerator.changeOrder(FFTOrder::order2048);
+    monoBuffer.setSize(1, leftChannelFFTDataGenerator.getFFTsize());
 
     updateChain();
     startTimerHz(60);
@@ -193,13 +198,54 @@ void ResponseCurveComponent::parameterValueChanged(int parameterIndex, float new
 
 void ResponseCurveComponent::timerCallback()
 {
+
+    juce::AudioBuffer<float> tempIncomingBuffer;
+
+    while (leftChannelFifo->getNumCompleteBuffersAvailable() > 0)
+    {
+        if (leftChannelFifo->getAudioBuffer(tempIncomingBuffer))
+        {
+            auto size = tempIncomingBuffer.getNumSamples();
+
+            juce::FloatVectorOperations::copy(monoBuffer.getWritePointer(0, 0),
+                monoBuffer.getReadPointer(0, size),
+                monoBuffer.getNumSamples() - size);
+
+            juce::FloatVectorOperations::copy(monoBuffer.getWritePointer(0, monoBuffer.getNumSamples() - size),
+                tempIncomingBuffer.getReadPointer(0, 0),
+                size);
+
+            leftChannelFFTDataGenerator.produceFFTDataForRendering(monoBuffer, -48.f);
+        }
+    }
+
+    const auto fftBounds = getAnalysisArea().toFloat();
+    const auto fftSize = leftChannelFFTDataGenerator.getFFTsize();
+    const auto binWidth = audioProcessor.getSampleRate() / (double)fftSize;
+
+    while (leftChannelFFTDataGenerator.getNumAvailableFFTDataBlocks() > 0)
+    {
+        std::vector<float> fftData;
+        if (leftChannelFFTDataGenerator.getFFTData(fftData))
+        {
+            pathProducer.generatePath(fftData, fftBounds, fftSize, binWidth, -48.f);
+        }
+    }
+
+    while (pathProducer.getNumPathIsAvailable())
+    {
+        pathProducer.getPath(leftChannelFFTPath);
+    }
+
     if (parametersChanged.compareAndSetBool(false, true))
     {
         // update the monochain
         updateChain();
         //signal a repaint
-        repaint();
+        //repaint();
     }
+
+    repaint();
 }
 
 void ResponseCurveComponent::updateChain()
@@ -221,11 +267,8 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
     using namespace juce;
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll(Colours::white);
-
     g.drawImage(background, getLocalBounds().toFloat());
-    //g.fillAll(Colours::white);
-
-    //auto responseArea = getLocalBounds();
+  
     auto responseArea = getAnalysisArea();
     auto w = responseArea.getWidth();
 
@@ -283,6 +326,9 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
     {
         responseCurve.lineTo(responseArea.getX() + i, map(mags[i]));
     }
+
+    g.setColour(Colours::forestgreen);
+    g.strokePath(leftChannelFFTPath, PathStrokeType(1.f));
 
     g.setColour(Colours::darkgreen);
     g.drawRect(getRenderArea(), 2.f);
@@ -408,13 +454,13 @@ juce::Rectangle<int> ResponseCurveComponent::getRenderArea()
 {
     auto bounds = getLocalBounds();
 
-    bounds.reduce(15,//JUCE_LIVE_CONSTANT(5),
-        15); //JUCE_LIVE_CONSTANT(5));
+    //bounds.reduce(15,//JUCE_LIVE_CONSTANT(5),
+    //    15); //JUCE_LIVE_CONSTANT(5));
 
-    //bounds.removeFromTop(13);
-    //bounds.removeFromBottom(13);
-    bounds.removeFromLeft(11);
-    bounds.removeFromRight(11);
+    bounds.removeFromTop(15);
+    bounds.removeFromBottom(3); // 15);
+    bounds.removeFromLeft(9+15);
+    bounds.removeFromRight(9+15);
 
     return bounds;
 }
@@ -447,9 +493,6 @@ SimpleEQAudioProcessorEditor::SimpleEQAudioProcessorEditor(SimpleEQAudioProcesso
     lowCutSlopeSliderAttachment(audioProcessor.apvts, "LowCut Slope", lowCutSlopeSlider),
     highCutSlopeSliderAttachment(audioProcessor.apvts, "HighCut Slope", highCutSlopeSlider)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-
     peakFreqSlider.labels.add({ 0.f, "20Hz" });
     peakFreqSlider.labels.add({ 1.f, "20kHz" });
 
@@ -471,12 +514,11 @@ SimpleEQAudioProcessorEditor::SimpleEQAudioProcessorEditor(SimpleEQAudioProcesso
     highCutSlopeSlider.labels.add({ 0.f, "12" });
     highCutSlopeSlider.labels.add({ 1.f, "48" });
 
-
     for (auto* comp : getComps())
     {
         addAndMakeVisible(comp);
     }
-    setSize (600, 480);
+    setSize (600, 540);
 }
 
 SimpleEQAudioProcessorEditor::~SimpleEQAudioProcessorEditor()
